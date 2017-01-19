@@ -16,43 +16,43 @@
 ///    along with this program.If not, see<http://www.gnu.org/licenses/>.       ///
 ///////////////////////////////////////////////////////////////////////////////////
 
+using AudioBenchDSP.Funcs;
 using AudioBenchDSP.Types;
+using System;
 
-namespace AudioBenchDSP.Funcs {
-  public static class VMath {
-    /// <summary>
-    /// Computes the DotProduct between Input and Taps and return the result as a Complex Number.
-    /// </summary>
-    /// <param name="result"></param>
-    /// <param name="input"></param>
-    /// <param name="taps"></param>
-    /// <param name="length"></param>
-    public unsafe static void DotProduct(out Complex result, Complex[] input, float[] taps, int length) {
-      fixed (Complex *iPtr = &input[0]) {
-        fixed (float *tapPtr = &taps[0]) {
-          _DotProduct(out result, iPtr, tapPtr, length);
+namespace AudioBenchDSP {
+  public class QuadratureDemodulator {
+    private DataBuffer temporaryBuffer;
+    private unsafe Complex* tempPtr;
+    private int tempLength;
+
+    public int Gain { get; set; }
+
+    public QuadratureDemodulator(int gain) {
+      this.Gain = gain;
+      temporaryBuffer = null;
+      tempLength = 0;
+    }
+
+    public unsafe void Work(Complex[] input, ref float[] output, int length) {
+      fixed (float* oPtr = &output[0]) {
+        fixed (Complex* iPtr = &input[0]) {
+          _Work(iPtr, oPtr, length);
         }
       }
     }
 
-    public static unsafe void MultiplyByConjugate(ref Complex *output, Complex *inputA, Complex *inputB, int length) {
-      for (int i=0; i<length; i++) {
-        output[i] = inputA[i] * inputB[i].Conjugate();
+    public unsafe void _Work(Complex* input, float* output, int length) {
+      if (tempLength != length) {
+        temporaryBuffer = DataBuffer.Create(length, sizeof(Complex));
+        tempPtr = (Complex*)temporaryBuffer;
+        tempLength = length;
       }
-    }
 
-    public static unsafe void _DotProduct(out Complex result, Complex *input, float *taps, int length) {
-      float[] res = { 0, 0 };
-
-      float* iPtr = (float*)input;
-      float* tPtr = taps;
-
+      VMath.MultiplyByConjugate(ref tempPtr, &input[1], input, length);
       for (int i = 0; i < length; i++) {
-        res[0] += ((*iPtr++) * (*tPtr));
-        res[1] += ((*iPtr++) * (*tPtr++));
+        output[i] = (float)(Gain * Math.Atan2(tempPtr[i].imag, tempPtr[i].real));
       }
-
-      result = new Complex(res[0], res[1]);
     }
   }
 }

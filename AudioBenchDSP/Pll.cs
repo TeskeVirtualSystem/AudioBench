@@ -17,42 +17,60 @@
 ///////////////////////////////////////////////////////////////////////////////////
 
 using AudioBenchDSP.Types;
+using System;
 
-namespace AudioBenchDSP.Funcs {
-  public static class VMath {
-    /// <summary>
-    /// Computes the DotProduct between Input and Taps and return the result as a Complex Number.
-    /// </summary>
-    /// <param name="result"></param>
-    /// <param name="input"></param>
-    /// <param name="taps"></param>
-    /// <param name="length"></param>
-    public unsafe static void DotProduct(out Complex result, Complex[] input, float[] taps, int length) {
-      fixed (Complex *iPtr = &input[0]) {
-        fixed (float *tapPtr = &taps[0]) {
-          _DotProduct(out result, iPtr, tapPtr, length);
-        }
+namespace AudioBenchDSP {
+  public class Pll : ControlLoop {
+    private readonly static float M_TWOPI = (float)Math.PI * 2;
+
+    private float lockSignal;
+
+    public bool Squelch { get; set; }
+    public float LockThreshold { get; set; }
+
+    public bool IsLocked {
+      get {
+        return Math.Abs(lockSignal) > LockThreshold;
       }
     }
 
-    public static unsafe void MultiplyByConjugate(ref Complex *output, Complex *inputA, Complex *inputB, int length) {
-      for (int i=0; i<length; i++) {
-        output[i] = inputA[i] * inputB[i].Conjugate();
+    public Pll(float loopBw, float maxFreq, float minFreq) : base(loopBw, maxFreq, minFreq) { }
+
+    private float modulus2pi(float input) {
+      if (input > Math.PI) {
+        return input - M_TWOPI;
+      } else if (input < -Math.PI) {
+        return input + M_TWOPI;
+      } else {
+        return input;
       }
     }
+    private float phaseDetector(Complex sample, float refPhase) {
+      float samplePhase = (float)Math.Atan2(sample.imag, sample.real);
+      return modulus2pi(samplePhase - refPhase);
+    }
 
-    public static unsafe void _DotProduct(out Complex result, Complex *input, float *taps, int length) {
-      float[] res = { 0, 0 };
-
-      float* iPtr = (float*)input;
-      float* tPtr = taps;
+    public void Work(Complex[] input, ref Complex[] output, int length) {
+      float error, imag, real;
 
       for (int i = 0; i < length; i++) {
-        res[0] += ((*iPtr++) * (*tPtr));
-        res[1] += ((*iPtr++) * (*tPtr++));
-      }
+        imag = (float)Math.Sin(phase);
+        real = (float)Math.Cos(phase);
 
-      result = new Complex(res[0], res[1]);
+        output[i] = input[i] * new Complex(real, -imag);
+
+        error = phaseDetector(input[i], phase);
+
+        AdvanceLoop(error);
+        PhaseWrap();
+        FrequencyLimit();
+
+        lockSignal = lockSignal * (1 - Alpha) + Alpha * (input[i].real * real + input[i].imag * imag);
+
+        if (Squelch && !IsLocked) {
+          output[i] = 0;
+        }
+      }
     }
   }
 }

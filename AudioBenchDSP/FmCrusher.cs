@@ -26,6 +26,9 @@ using static AudioBenchDSP.Callbacks.ManagedCallbacks;
 namespace AudioBenchDSP {
   public class FmCrusher {
     private FirFilter decimator;
+    private QuadratureDemodulator quadDemod;
+    private Pll pll;
+
     private int decimation;
     private int inputRate;
     private int outputRate;
@@ -34,6 +37,7 @@ namespace AudioBenchDSP {
 
     private Complex[] buffer1;
     private Complex[] buffer2;
+    private float[] buffer3;
 
     public event FmCrusherAudioEvent AudioEvent;
 
@@ -54,6 +58,8 @@ namespace AudioBenchDSP {
 
       float[] taps = Filters.simpleLowPass(inputRate, inputRate / (decimation * 2), 63);
       decimator = new FirFilter(decimation, taps);
+      pll = new Pll((float)Math.PI / 100, (float)Math.PI * 2 / 100, (float)Math.PI / 200);
+      quadDemod = new QuadratureDemodulator(1);
     }
 
     public void Feed(Complex[] samples) {
@@ -83,8 +89,16 @@ namespace AudioBenchDSP {
       }
 
       // Low Pass / Decimate
-      decimator.Work(buffer1, ref buffer2, length / decimation);
+      length /= decimation;
+      decimator.Work(buffer1, ref buffer2, length);
 
+      // Sync
+      pll.Work(buffer2, ref buffer1, length);
+
+      // Demodulate
+      quadDemod.Work(buffer1, ref buffer3, length);
+
+      // Filter output
     }
   }
 }

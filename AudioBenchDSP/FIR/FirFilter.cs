@@ -19,9 +19,9 @@
 using AudioBenchDSP.Types;
 
 namespace AudioBenchDSP.FIR {
-  public class FirFilter {
+  public class FirFilter<T> where T : struct {
     private FirKernel kernel;
-    private Complex[] samples;
+    private T[] samples;
     private int sampleHistory;
     private int decimation;
 
@@ -29,16 +29,16 @@ namespace AudioBenchDSP.FIR {
       this.kernel = new FirKernel(taps);
       this.sampleHistory = taps.Length;
       this.decimation = decimation;
-      samples = new Complex[sampleHistory];
+      samples = new T[sampleHistory];
       for (int i = 0; i < sampleHistory; i++) {
-        samples[i] = new Complex(0, 0);
+        samples[i] = new T();
       }
     }
-
-    public int Work(Complex[] input, ref Complex[] output, int length) {
+    
+    public int Work(T[] input, ref T[] output, int length) {
       if (samples.Length < length * decimation + sampleHistory) {
-        Complex[] oldHistory = samples;
-        samples = new Complex[length * decimation + sampleHistory];
+        T[] oldHistory = samples;
+        samples = new T[length * decimation + sampleHistory];
         for (int i = 0; i < oldHistory.Length; i++) {
           samples[i] = oldHistory[i];
         }

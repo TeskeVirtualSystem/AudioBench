@@ -35,13 +35,21 @@ namespace AudioBenchDSP.Funcs {
       }
     }
 
+    public unsafe static void DotProduct(out float result, float[] input, float[] taps, int length) {
+      fixed (float* iPtr = &input[0]) {
+        fixed (float* tapPtr = &taps[0]) {
+          _DotProduct(out result, iPtr, tapPtr, length);
+        }
+      }
+    }
+
     public static unsafe void MultiplyByConjugate(ref Complex *output, Complex *inputA, Complex *inputB, int length) {
       for (int i=0; i<length; i++) {
         output[i] = inputA[i] * inputB[i].Conjugate();
       }
     }
 
-    public static unsafe void _DotProduct(out Complex result, Complex *input, float *taps, int length) {
+    public static unsafe void _DotProduct(out Complex result, Complex* input, float* taps, int length) {
       float[] res = { 0, 0 };
 
       float* iPtr = (float*)input;
@@ -53,6 +61,19 @@ namespace AudioBenchDSP.Funcs {
       }
 
       result = new Complex(res[0], res[1]);
+    }
+
+    public static unsafe void _DotProduct(out float result, float* input, float* taps, int length) {
+      float res = 0;
+
+      float* iPtr = (float*)input;
+      float* tPtr = taps;
+
+      for (int i = 0; i < length; i++) {
+        res += ((*iPtr++) * (*tPtr++));
+      }
+
+      result = res;
     }
   }
 }

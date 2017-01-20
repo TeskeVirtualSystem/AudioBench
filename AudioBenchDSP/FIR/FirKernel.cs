@@ -16,6 +16,7 @@
 ///    along with this program.If not, see<http://www.gnu.org/licenses/>.       ///
 ///////////////////////////////////////////////////////////////////////////////////
 
+using System;
 using AudioBenchDSP.Funcs;
 using AudioBenchDSP.Types;
 
@@ -55,6 +56,26 @@ namespace AudioBenchDSP.FIR {
       return _Filter(input);
     }
 
+    public void FilterDecimating<T>(T[] input, T[] output, int length, int decimate) where T : struct {
+      if (typeof(T) == typeof(float)) {
+        _FilterDecimating((float[])(object)input, (float[])(object)output, length, decimate);
+      } else if (typeof(T) == typeof(Complex)) {
+        _FilterDecimating((Complex[])(object)input, (Complex[])(object)output, length, decimate);
+      } else {
+        throw new NotImplementedException();
+      }
+    }
+
+    internal void Filter<T>(T[] samples, T[] output, int length) where T : struct {
+      if (typeof(T) == typeof(float)) {
+        Filter((float[])(object)samples, (float[])(object)output, length);
+      } else if (typeof(T) == typeof(Complex)) {
+        Filter((Complex[])(object)samples, (Complex[])(object)output, length);
+      } else {
+        throw new NotImplementedException();
+      }
+    }
+
     private unsafe void _Filter(Complex[] input, Complex[] output, int length) {
       fixed (Complex* iPtr = &input[0]) {
         for (uint i = 0; i < length; i++) {
@@ -71,13 +92,32 @@ namespace AudioBenchDSP.FIR {
         }
       }
     }
+    public unsafe void _FilterDecimating(float[] input, float[] output, int length, int decimate) {
+      int j = 0;
+      fixed (float* iPtr = &input[0]) {
+        for (uint i = 0; i < length; i++) {
+          output[i] = _Filter(&iPtr[j]);
+          j += decimate;
+        }
+      }
+    }
     private unsafe Complex _Filter(Complex* input) {
       Complex o;
-      VMath.DotProduct(out o, input, taps, tapsLength);
+      VMath._DotProduct(out o, input, taps, tapsLength);
+      return o;
+    }
+    private unsafe float _Filter(float* input) {
+      float o;
+      VMath._DotProduct(out o, input, taps, tapsLength);
       return o;
     }
     private unsafe Complex _Filter(Complex[] input) {
       fixed (Complex* iPtr = &input[0]) {
+        return _Filter(iPtr);
+      }
+    }
+    private unsafe float _Filter(float[] input) {
+      fixed (float* iPtr = &input[0]) {
         return _Filter(iPtr);
       }
     }

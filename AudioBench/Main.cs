@@ -27,7 +27,7 @@ using System.Windows.Forms;
 
 namespace AudioBench {
   public partial class Main : Form {
-    private int audioSampleRate = 32000;
+    private int audioSampleRate = 40000;
     private int audioBufferInMs = 100;
 
     private object audioLock;
@@ -96,8 +96,8 @@ namespace AudioBench {
         if (audioFifo.Count >= length) {
           for (int i = 0; i < length; i++) {
             float sample = audioFifo.Dequeue();
-            audio[i * 2] = sample * 50000;
-            audio[i * 2 + 1] = sample * 50000;
+            audio[i * 2] = sample;
+            audio[i * 2 + 1] = sample;
           }
         } else {
           for (int i = 0; i < length; i++) {
@@ -106,6 +106,11 @@ namespace AudioBench {
           }
         }
       }
+    }
+
+    private void Main_FormClosing(object sender, FormClosingEventArgs e) {
+      rtlDevice.Stop();
+      fmCrusher.Stop();
     }
   }
 }

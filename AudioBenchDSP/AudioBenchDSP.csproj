@@ -54,11 +54,14 @@
     <Compile Include="Callbacks\ManagedCallbacks.cs" />
     <Compile Include="Callbacks\UnsafeSampleEventArgs.cs" />
     <Compile Include="ControlLoop.cs" />
+    <Compile Include="Deemphasis.cs" />
     <Compile Include="FIR\FirFilter.cs" />
     <Compile Include="FIR\FirKernel.cs" />
     <Compile Include="FmCrusher.cs" />
     <Compile Include="Funcs\Filters.cs" />
     <Compile Include="Funcs\VMath.cs" />
+    <Compile Include="IIR\IIRFilter.cs" />
+    <Compile Include="IIR\IIRKernel.cs" />
     <Compile Include="Pll.cs" />
     <Compile Include="PortAudio\AudioDevice.cs" />
     <Compile Include="PortAudio\AudioDeviceDirection.cs" />

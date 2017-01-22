@@ -30,6 +30,7 @@ namespace AudioBenchDSP {
     private FirFilter<float> audioDecimator;
     private QuadratureDemodulator quadDemod;
     private Pll pll;
+    private Deemphasis deemphasis;
 
     private int decimation;
     private int audioDecimation;
@@ -43,10 +44,11 @@ namespace AudioBenchDSP {
     private float[] buffer3;
     private float[] buffer4;
     private Thread worker;
+    private bool running;
 
     public event FmCrusherAudioEvent AudioEvent;
 
-    public FmCrusher(int inputRate, int outputRate) {
+    public FmCrusher(int inputRate, int outputRate, int gain = 1, int intermediateBW = 256000, float audioTransition = 10e3f) {
       this.inputRate = inputRate;
       this.outputRate = outputRate;
       samplesFifo = new Queue<Complex>();
@@ -56,21 +58,27 @@ namespace AudioBenchDSP {
 
       // We need 160kHz output band for Demod.
       // Let's see if we have an integer divider
-      decimation = inputRate / 160000;
-      if (decimation * 160000 != inputRate) {
-        throw new ArgumentException("Input sample rate is not multiple of 160000");
+      decimation = inputRate / intermediateBW;
+      if (decimation * intermediateBW != inputRate) {
+        //throw new ArgumentException("Input sample rate is not multiple of " + intermediateBW);
+        intermediateBW = inputRate / decimation;
+        Console.WriteLine("Changing the Intermediate Bandwidth to {0}", intermediateBW);
       }
 
-      audioDecimation = 160000 / outputRate;
+      audioDecimation = intermediateBW / outputRate;
+      float transitionWidth = outputRate / 32;
+      float audioCutFreq = outputRate / 2 > 16000 ? 16000 : outputRate / 2;
+      float[] taps = Filters.lowPass(gain, intermediateBW, audioCutFreq - transitionWidth, transitionWidth);
 
-      float[] taps = Filters.simpleLowPass(160000, outputRate / 2.0f, 63);
       audioDecimator = new FirFilter<float>(audioDecimation, taps);
-
-      taps = Filters.simpleLowPass(inputRate, inputRate / (decimation * 2), 63);
+      
+      taps = Filters.lowPass(1, inputRate, inputRate / (decimation * 2) - audioTransition, audioTransition);
       decimator = new FirFilter<Complex>(decimation, taps);
       pll = new Pll((float)Math.PI / 100, (float)Math.PI * 2 / 100, (float)Math.PI / 200);
       quadDemod = new QuadratureDemodulator(1);
+      deemphasis = new Deemphasis(outputRate);
 
+      running = true;
       worker = new Thread(new ThreadStart(WorkCycle));
       worker.Priority = ThreadPriority.Highest;
       worker.Start();
@@ -84,8 +92,17 @@ namespace AudioBenchDSP {
       }
     }
 
+    public void Stop() {
+      running = false;
+      worker.Join();
+    }
+
+    public bool PllLocked() {
+      return pll.IsLocked;
+    }
+
     private void WorkCycle() {
-      while (true) {
+      while (running) {
         int length = 0;
         // Fetch Samples
         lock (queueLock) {
@@ -110,18 +127,21 @@ namespace AudioBenchDSP {
         decimator.Work(buffer1, ref buffer2, length);
 
         // Sync
-        pll.Work(buffer2, ref buffer1, length);
+        //pll.Work(buffer2, ref buffer1, length);
 
         // Demodulate
-        quadDemod.Work(buffer1, ref buffer3, length);
+        quadDemod.Work(buffer2, ref buffer3, length);
 
         // Filter output
         length /= audioDecimation;
         audioDecimator.Work(buffer3, ref buffer4, length);
 
+        // Deemphasis Filter
+        deemphasis.Work(buffer4, ref buffer3, length);
+
         float[] outdata = new float[length];
         for (int i=0; i<length; i++) {
-          outdata[i] = buffer4[i];
+          outdata[i] = buffer3[i];
         }
         // Send output
         AudioEvent(new Callbacks.FmCrusherAudioData(outdata, outputRate));
